@@ -1,0 +1,489 @@
+import random
+import time
+from collections import defaultdict
+import os
+
+
+class Casino:
+    def __init__(self):
+        self.balance = int(input('Пополните баланс: '))  # Стартовый баланс для всех игр
+
+    def show_menu(self):
+        print("\n ДОБРО ПОЖАЛОВАТЬ В CASIC!!! ХОЧЕШЬ ПОДНЯТЬ БАБЛА?")
+        print(f"Ваш текущий баланс: ${self.balance}")
+        print("\nВыберите игру:")
+        print("1. Рулетка")
+        print("2. Игровой автомат")
+        print("3. Блэкджек")
+        print("4. Русская рулетка")
+        print("5. Выход")
+
+    def run(self):
+        while True:
+            self.show_menu()
+            choice = input("Ваш выбор (1-5): ")
+
+            if choice == '1':
+                game = RouletteGame(self.balance)
+                self.balance = game.play()
+            elif choice == '2':
+                game = SlotMachine(self.balance)
+                self.balance = game.play()
+            elif choice == '3':
+                game = BlackjackGame(self.balance)
+                self.balance = game.play()
+            elif choice == '4':
+                game = BrazilRoulette(self.balance)
+                self.balance = game.play()
+            elif choice == '5':
+                print(f"\nСпасибо за игру! Ваш финальный баланс: ${self.balance}")
+                break
+            else:
+                print("Некорректный ввод. Попробуйте еще раз.")
+
+
+class RouletteGame:
+    def __init__(self, initial_balance):
+        self.balance = initial_balance
+        self.bets = defaultdict(dict)
+        self.wheel = list(range(0, 37))
+        self.red_numbers = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
+        self.black_numbers = set(range(1, 37)) - self.red_numbers
+        self.game_history = []
+
+    def spin_wheel(self):
+        result = random.choice(self.wheel)
+        color = self.get_color(result)
+        self.game_history.append((result, color))
+        return result, color
+
+    def get_color(self, number):
+        if number == 0:
+            return 'green'
+        return 'red' if number in self.red_numbers else 'black'
+
+    def place_bet(self, bet_type, amount, number=None):
+        if amount > self.balance:
+            print("Недостаточно средств на балансе!")
+            return False
+
+        self.balance -= amount
+        self.bets[bet_type][number] = self.bets[bet_type].get(number, 0) + amount
+        return True
+
+    def calculate_payout(self, result, color):
+        total_payout = 0
+
+        for bet_type, bets in self.bets.items():
+            if bet_type == 'number':
+                for number, amount in bets.items():
+                    if number == result:
+                        total_payout += amount * 36
+            elif bet_type == 'color':
+                for color_bet, amount in bets.items():
+                    if color_bet == color:
+                        total_payout += amount * 2
+            elif bet_type == 'even_odd':
+                for eo, amount in bets.items():
+                    if result != 0 and ((eo == 'even' and result % 2 == 0) or (eo == 'odd' and result % 2 == 1)):
+                        total_payout += amount * 2
+            elif bet_type == 'dozen':
+                for dozen, amount in bets.items():
+                    if (dozen == 'first' and 1 <= result <= 12) or \
+                            (dozen == 'second' and 13 <= result <= 24) or \
+                            (dozen == 'third' and 25 <= result <= 36):
+                        total_payout += amount * 3
+
+        self.balance += total_payout
+        return total_payout
+
+    def display_wheel_animation(self):
+        print("\nКрутим рулетку...")
+        for _ in range(10):
+            print(random.choice(self.wheel), end='\r')
+            time.sleep(0.1)
+
+    def display_betting_options(self):
+        print("\nДоступные ставки:")
+        print("1. На число (1-36) - выплата 35:1")
+        print("2. На цвет (red/black) - выплата 1:1")
+        print("3. Чет/Нечет (even/odd) - выплата 1:1")
+        print("4. Дюжины (first/second/third) - выплата 2:1")
+        print("5. Закончить ставки и крутить")
+
+    def play(self):
+        print("\n=== ИГРА В РУЛЕТКУ ===")
+        print(f"Ваш баланс: ${self.balance}")
+
+        while True:
+            self.bets.clear()
+            print("\n" + "=" * 40)
+            print(f"\nТекущий баланс: ${self.balance}")
+
+            if self.balance <= 0:
+                print("У вас закончились деньги!")
+                break
+
+            while True:
+                self.display_betting_options()
+                choice = input("\nВыберите тип ставки (1-5): ")
+
+                if choice == '5':
+                    if not self.bets:
+                        print("Вы не сделали ни одной ставки!")
+                        continue
+                    break
+
+                try:
+                    bet_type = {
+                        '1': 'number',
+                        '2': 'color',
+                        '3': 'even_odd',
+                        '4': 'dozen'
+                    }.get(choice)
+
+                    if not bet_type:
+                        print("Некорректный выбор!")
+                        continue
+
+                    if bet_type == 'number':
+                        number = int(input("Выберите число (0-36): "))
+                        if number < 0 or number > 36:
+                            print("Число должно быть от 0 до 36!")
+                            continue
+                    elif bet_type == 'color':
+                        number = input("Выберите цвет (red/black): ").lower()
+                        if number not in ['red', 'black']:
+                            print("Только red или black!")
+                            continue
+                    elif bet_type == 'even_odd':
+                        number = input("Выберите (even/odd): ").lower()
+                        if number not in ['even', 'odd']:
+                            print("Только even или odd!")
+                            continue
+                    elif bet_type == 'dozen':
+                        number = input("Выберите дюжину (first/second/third): ").lower()
+                        if number not in ['first', 'second', 'third']:
+                            print("Только first, second или third!")
+                            continue
+
+                    amount = int(input(f"Сумма ставки (макс ${self.balance}): "))
+                    if not self.place_bet(bet_type, amount, number):
+                        continue
+
+                    print(f"Ставка принята: {bet_type} {number if number is not None else ''} на ${amount}")
+
+                except ValueError:
+                    print("Некорректный ввод!")
+                    continue
+
+            self.display_wheel_animation()
+            result, color = self.spin_wheel()
+            payout = self.calculate_payout(result, color)
+
+            print(f"\nВыпало: {result} {color}")
+            print(f"Ваш выигрыш: ${payout}")
+            print(f"Новый баланс: ${self.balance}")
+
+            print("\nПоследние результаты:", ', '.join(
+                f"{num} {col}" for num, col in self.game_history[-5:]
+            ))
+
+            play_again = input("\nСыграть еще раз? (да/нет): ").lower()
+            if play_again != 'да':
+                print(f"\nИгра окончена. Ваш баланс: ${self.balance}")
+                break
+
+        return self.balance
+
+
+class SlotMachine:
+    SYMBOLS = ["🍒", "🍋", "🍊", "🍇", "🔔", "7️⃣"]
+    PAYOUTS = {
+        "🍒🍒🍒": 2,
+        "🍋🍋🍋": 3,
+        "🍊🍊🍊": 4,
+        "🍇🍇🍇": 5,
+        "🔔🔔🔔": 10,
+        "7️⃣7️⃣7️⃣": 20
+    }
+
+    def __init__(self, initial_balance):
+        self.balance = initial_balance
+        self.game_history = []
+        self.current_bet = 10
+
+    def spin(self, bet):
+        if bet > self.balance:
+            return {"error": "Недостаточно средств"}
+
+        self.balance -= bet
+        reels = [
+            random.choice(self.SYMBOLS),
+            random.choice(self.SYMBOLS),
+            random.choice(self.SYMBOLS)
+        ]
+        result = "".join(reels)
+
+        win = 0
+        if result in self.PAYOUTS:
+            win = bet * self.PAYOUTS[result]
+            self.balance += win
+
+        self.game_history.append((reels, win))
+        return {
+            "reels": reels,
+            "win": win,
+            "balance": self.balance
+        }
+
+    def display_reels_animation(self):
+        print("\nБарабаны крутятся...")
+        for _ in range(5):
+            print(" | ".join(random.choices(self.SYMBOLS, k=3)), end="\r")
+            time.sleep(0.2)
+
+    def play(self):
+        print("\n=== ИГРОВОЙ АВТОМАТ ===")
+        print(f"Ваш баланс: ${self.balance}")
+        print("Символы и выплаты:")
+        for combo, mult in self.PAYOUTS.items():
+            print(f"{combo}: x{mult}")
+
+        while True:
+            print("\n" + "=" * 40)
+            print(f"\nТекущий баланс: ${self.balance}")
+            print(f"Текущая ставка: ${self.current_bet}")
+
+            if self.balance <= 0:
+                print("У вас закончились деньги!")
+                break
+
+            change_bet = input("\nХотите изменить ставку? (да/нет): ").strip().lower()
+            if change_bet in ['да', 'д', 'y', 'yes']:
+                try:
+                    new_bet = int(input(f"Ваша ставка (0 - выход, текущая: {self.current_bet}): "))
+                    if new_bet == 0:
+                        break
+                    if new_bet < 1:
+                        print("Минимальная ставка $1")
+                        continue
+                    if new_bet > self.balance:
+                        print("Недостаточно средств!")
+                        continue
+                    self.current_bet = new_bet
+                except ValueError:
+                    print("Введите число!")
+                    continue
+            elif change_bet in ['нет', 'н', 'n', 'no']:
+                pass
+            else:
+                print("Пожалуйста, ответьте 'да' или 'нет'")
+                continue
+
+            self.display_reels_animation()
+            result = self.spin(self.current_bet)
+
+            print("\nРезультат:")
+            print(" | ".join(result["reels"]))
+            if result["win"] > 0:
+                print(f"🎉 Вы выиграли ${result['win']}!")
+            else:
+                print("😢 Попробуйте еще раз!")
+
+            print("\nПоследние 3 игры:")
+            for i, (reels, win) in enumerate(self.game_history[-3:], 1):
+                print(f"{i}. {' | '.join(reels)} - {'+$' + str(win) if win else 'нет выигрыша'}")
+
+        print(f"\nИгра окончена. Ваш баланс: ${self.balance}")
+        return self.balance
+
+
+class BlackjackGame:
+    def __init__(self, initial_balance):
+        self.balance = initial_balance
+        self.deck = []
+        self.player_hand = []
+        self.dealer_hand = []
+        self.player_score = 0
+        self.dealer_score = 0
+        self.game_over = False
+        self.current_bet = 0
+        self.reset_deck()
+
+    def reset_deck(self):
+        self.deck = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11] * 4
+        random.shuffle(self.deck)
+
+    def deal_card(self):
+        return self.deck.pop()
+
+    def calculate_score(self, hand):
+        score = sum(hand)
+        if score > 21 and 11 in hand:
+            hand.remove(11)
+            hand.append(1)
+            score = sum(hand)
+        return score
+
+    def initial_deal(self):
+        self.player_hand = [self.deal_card(), self.deal_card()]
+        self.dealer_hand = [self.deal_card(), self.deal_card()]
+        self.player_score = self.calculate_score(self.player_hand)
+        self.dealer_score = self.calculate_score(self.dealer_hand)
+
+    def player_hit(self):
+        self.player_hand.append(self.deal_card())
+        self.player_score = self.calculate_score(self.player_hand)
+        if self.player_score > 21:
+            self.game_over = True
+
+    def dealer_play(self):
+        while self.dealer_score < 17:
+            self.dealer_hand.append(self.deal_card())
+            self.dealer_score = self.calculate_score(self.dealer_hand)
+        self.game_over = True
+
+    def determine_winner(self):
+        if self.player_score > 21:
+            return "Вы проиграли - перебор!", 0
+        elif self.dealer_score > 21:
+            return "Вы выиграли - у дилера перебор!", self.current_bet * 2
+        elif self.player_score == self.dealer_score:
+            return "Ничья!", self.current_bet
+        elif self.player_score == 21 and len(self.player_hand) == 2:
+            return "Blackjack! Вы выиграли!", self.current_bet * 2.5
+        elif self.player_score > self.dealer_score:
+            return "Вы выиграли!", self.current_bet * 2
+        else:
+            return "Вы проиграли!", 0
+
+    def display_hands(self, show_all=False):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("=== BLACKJACK ===")
+        print(f"\nБаланс: ${self.balance} | Ставка: ${self.current_bet}")
+        print(f"\nКарты дилера: {' '.join(map(str, self.dealer_hand)) if show_all else f'{self.dealer_hand[0]} ?'}")
+        print(f"Ваши карты: {' '.join(map(str, self.player_hand))}")
+        print(f"Ваши очки: {self.player_score}\n")
+
+    def place_bet(self):
+        while True:
+            try:
+                bet = int(input(f"Ваша ставка (1-{self.balance}): "))
+                if bet < 1 or bet > self.balance:
+                    print(f"Ставка должна быть от 1 до {self.balance}")
+                    continue
+                self.balance -= bet
+                self.current_bet = bet
+                break
+            except ValueError:
+                print("Введите число!")
+
+    def play(self):
+        print("\n=== BLACKJACK ===")
+        print(f"Ваш баланс: ${self.balance}")
+
+        while True:
+            if self.balance <= 0:
+                print("У вас закончились деньги!")
+                break
+
+            self.place_bet()
+            self.reset_deck()
+            self.player_hand = []
+            self.dealer_hand = []
+            self.game_over = False
+            self.initial_deal()
+
+            while not self.game_over:
+                self.display_hands()
+
+                if self.player_score == 21 or len(self.player_hand) >= 5:
+                    self.game_over = True
+                    break
+
+                action = input("Взять карту? (да/нет): ").lower()
+                if action == 'да':
+                    self.player_hit()
+                elif action == 'нет':
+                    self.dealer_play()
+                else:
+                    print("Некорректный ввод. Введите 'да' или 'нет'.")
+
+            self.display_hands(show_all=True)
+            result, win_amount = self.determine_winner()
+            self.balance += win_amount
+            print(result)
+            print(f"Ваш баланс: ${self.balance}")
+
+            replay = input("\nСыграть еще раз? (да/нет): ").lower()
+            if replay != 'да':
+                print(f"\nИгра окончена. Ваш баланс: ${self.balance}")
+                break
+
+        return self.balance
+
+
+class BrazilRoulette:
+    def __init__(self, initial_balance):
+        self.balance = initial_balance
+        self.initial_balance = initial_balance
+
+    def spin(self, bet):
+        print("Крутите барабан (нажмите Enter)")
+        input()
+        r = random.randint(-1, 1)
+        if r == 0:
+            r = random.randint(-1, 1)
+        k = random.randint(0, 1000) / 1000
+
+        win_amount = round(r * bet * k, 2)
+        self.balance += win_amount
+        self.balance = round(self.balance, 2)
+
+        if r >= 0:
+            print(f'+ ${win_amount:.2f}')
+        else:
+            print(f'- ${abs(win_amount):.2f}')
+
+        print(f"Ваш баланс: ${self.balance:.2f}")
+
+    def play(self):
+        print("\n=== РУССКАЯ РУЛЕТКА ===")
+        print(f"Ваш баланс: ${self.balance:.2f}")
+
+        while True:
+            if self.balance <= 0:
+                print("У вас закончились деньги!")
+                break
+
+            try:
+                print(f"\nВаш баланс: ${self.balance:.2f}")
+                bet = input("Ваша ставка (или 'выход'): ")
+                if bet.lower() in ['выход', 'exit', 'quit']:
+                    break
+                bet = float(bet)
+                if bet > self.balance:
+                    print("Ставка не может быть больше вашего баланса!")
+                    continue
+                if bet <= 0:
+                    print("Ставка должна быть положительной!")
+                    continue
+
+                self.spin(bet)
+            except ValueError:
+                print("Некорректный ввод. Введите число или 'выход'.")
+
+        win = self.balance - self.initial_balance
+        if win > 0:
+            print(f"\nВы выиграли ${win:.2f}")
+        else:
+            print(f"\nВы проиграли ${abs(win):.2f}")
+
+        print(f"Игра окончена. Ваш баланс: ${self.balance:.2f}")
+        return self.balance
+
+
+if __name__ == "__main__":
+    casino = Casino()
+    casino.run()
